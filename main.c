@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <stdbool.h>
 #include <math.h>
+#include <stdio.h>
 
 #define PI 3.14159265358979323846f
 
@@ -100,8 +101,9 @@ typedef enum {
 } Color;
 
 typedef struct {
-  bool leftFlipperDown;
-  bool rightFlipperDown;
+  bool fireIsDown;
+  bool fireIsPressed;
+  bool fireWasDown;
 } Buttons;
 
 typedef struct {
@@ -178,6 +180,16 @@ void drawLine(BackBuffer *bb, Vec2 v1, Vec2 v2, Color color) {
   int y1 = (int)v1.y;
   int x2 = (int)v2.x;
   int y2 = (int)v2.y;
+
+  if (x1 > bb->width - 1) x1 = bb->width - 1;
+  if (x1 < 0) x1 = 0;
+  if (y1 > bb->height - 1) y1 = bb->height - 1;
+  if (y1 < 0) y1 = 0;
+
+  if (x2 > bb->width - 1) x2 = bb->width - 1;
+  if (x2 < 0) x2 = 0;
+  if (y2 > bb->height - 1) y2 = bb->height - 1;
+  if (y2 < 0) y2 = 0;
 
   if (x1 == x2 && y1 == y2) {
     setPixel(bb, x1, y1, color);
@@ -285,7 +297,8 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
 
   bool running = true;
   HDC deviceContext = GetDC(wnd);
-  BackBuffer bb = makeBackBuffer(windowWidth/4, windowHeight/4);
+  int bbInvScale = 4;
+  BackBuffer bb = makeBackBuffer(windowWidth/bbInvScale, windowHeight/bbInvScale);
   Buttons buttons = {0};
 
   Ball balls[2] = {0};
@@ -294,19 +307,18 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
     float radius = 10.0f;
     float mass = 10.0f;
 
-    balls[i].position.x = (float) bb.width / 2;
-    balls[i].position.y = (float) bb.height / 2;
-    balls[i].radius = radius;
-    balls[i].color = COLOR_RED;
-    balls[i].mass = mass;
-
-    ++i;
-
     balls[i].position.x = (float) bb.width / 4;
     balls[i].position.y = (float) bb.height / 2;
     balls[i].radius = radius;
     balls[i].color = COLOR_GREEN;
-    balls[i].velocity.x = 100.0f;
+    balls[i].mass = mass;
+
+    ++i;
+
+    balls[i].position.x = (float) bb.width / 2;
+    balls[i].position.y = (float) bb.height / 2;
+    balls[i].radius = radius;
+    balls[i].color = COLOR_RED;
     balls[i].mass = mass;
   }
 
@@ -327,16 +339,10 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
 
         case WM_KEYDOWN:
         case WM_KEYUP:
-          bool isDown = ((msg.lParam & (1 << 31)) == 0);
+          //bool isDown = ((msg.lParam & (1 << 31)) == 0);
           switch (msg.wParam) {
             case VK_ESCAPE:
               running = false;
-              break;
-            case 0x5A: // Z
-              buttons.leftFlipperDown = isDown;
-              break;
-            case 0xBF: // slash
-              buttons.rightFlipperDown = isDown;
               break;
           }
           break;
@@ -346,6 +352,26 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
           DispatchMessage(&msg);
           break;
       }
+    }
+
+    buttons.fireIsDown = (GetKeyState(VK_LBUTTON) & 0x100) != 0;
+    buttons.fireIsPressed = buttons.fireIsDown && !buttons.fireWasDown;
+    buttons.fireWasDown = buttons.fireIsDown;
+
+    Vec2 mousePos;
+    {
+      POINT p;
+      GetCursorPos(&p);
+      ScreenToClient(wnd, &p);
+      mousePos.x = (float)p.x / (float)bbInvScale;
+      mousePos.y = (float)bb.height - (float)p.y / (float)bbInvScale;
+      char buf[100];
+      sprintf_s(buf, ARR_LEN(buf), "%f,%f\n", mousePos.x, mousePos.y);
+      OutputDebugString(buf);
+    }
+
+    if (buttons.fireIsPressed) {
+      balls[0].velocity = subVec2(mousePos, balls[0].position);
     }
 
     for (int i = 0; i < ARR_LEN(balls); ++i) {
@@ -415,6 +441,23 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
       }
 
       A->velocity = addVec2(A->velocity, scaleVec2(A->acceleration, dt));
+
+      if (A->position.x > bb.width - A->radius - 1) {
+        A->position.x = bb.width - A->radius - 1;
+        A->velocity.x = -A->velocity.x;
+      }
+      if (A->position.x < A->radius) {
+        A->position.x = A->radius;
+        A->velocity.x = -A->velocity.x;
+      }
+      if (A->position.y > bb.height - A->radius - 1) {
+        A->position.y = bb.height - A->radius - 1;
+        A->velocity.y = -A->velocity.y;
+      }
+      if (A->position.y < A->radius) {
+        A->position.y = A->radius;
+        A->velocity.y = -A->velocity.y;
+      }
     }
 
     clearBackBuffer(&bb, COLOR_BLACK);
@@ -423,6 +466,8 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
       Ball *b = balls + i;
       drawCircle(&bb, b->position, b->radius, b->color);
     }
+
+    drawLine(&bb, balls[0].position, mousePos, COLOR_YELLOW);
 
     StretchDIBits(deviceContext, 0, 0, windowWidth, windowHeight,
                   0, 0, bb.width, bb.height, bb.memory,
