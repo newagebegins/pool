@@ -25,11 +25,30 @@ Vec2 addVec2(Vec2 v1, Vec2 v2) {
   return v;
 }
 
+Vec2 subVec2(Vec2 v1, Vec2 v2) {
+  Vec2 v;
+  v.x = v1.x - v2.x;
+  v.y = v1.y - v2.y;
+  return v;
+}
+
 Vec2 scaleVec2(Vec2 v, float s) {
   Vec2 r;
   r.x = v.x * s;
   r.y = v.y * s;
   return r;
+}
+
+float getMagnitudeVec2(Vec2 v) {
+  return sqrtf(v.x*v.x + v.y*v.y);
+}
+
+Vec2 normalizeVec2(Vec2 v) {
+  return scaleVec2(v, 1.0f/getMagnitudeVec2(v));
+}
+
+float dot2(Vec2 a, Vec2 b) {
+  return a.x*b.x + a.y*b.y;
 }
 
 typedef struct {
@@ -212,6 +231,7 @@ typedef struct {
   Vec2 acceleration;
   float radius;
   Color color;
+  float mass;
 } Ball;
 
 LRESULT CALLBACK wndProc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -254,6 +274,8 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
   UpdateWindow(wnd);
 
   float dt = 0.0f;
+  float targetFps = 60.0f;
+  float maxDt = 1.0f / targetFps;
   LARGE_INTEGER perfcFreq = {0};
   LARGE_INTEGER perfc = {0};
   LARGE_INTEGER prefcPrev = {0};
@@ -270,11 +292,13 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
   {
     int i = 0;
     float radius = 10.0f;
+    float mass = 10.0f;
 
     balls[i].position.x = (float) bb.width / 2;
     balls[i].position.y = (float) bb.height / 2;
     balls[i].radius = radius;
     balls[i].color = COLOR_RED;
+    balls[i].mass = mass;
 
     ++i;
 
@@ -282,12 +306,17 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
     balls[i].position.y = (float) bb.height / 2;
     balls[i].radius = radius;
     balls[i].color = COLOR_GREEN;
+    balls[i].velocity.x = 100.0f;
+    balls[i].mass = mass;
   }
 
   while (running) {
     prefcPrev = perfc;
     QueryPerformanceCounter(&perfc);
     dt = (float)(perfc.QuadPart - prefcPrev.QuadPart) / (float)perfcFreq.QuadPart;
+    if (dt > maxDt) {
+      dt = maxDt;
+    }
 
     MSG msg;
     while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
@@ -319,11 +348,80 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
       }
     }
 
+    for (int i = 0; i < ARR_LEN(balls); ++i) {
+      Ball *A = balls + i;
+      Vec2 aMove = scaleVec2(A->velocity, dt);
+      bool collided = false;
+
+      for (int j = 0; j < ARR_LEN(balls); ++j) {
+        if (i == j) continue;
+
+        Ball *B = balls + j;
+
+        float centersDist = getMagnitudeVec2(subVec2(B->position, A->position));
+        float sumRadii = A->radius + B->radius;
+        float sumRadiiSquared = sumRadii*sumRadii;
+        float dist = centersDist - sumRadii;
+        float moveMagnitude = getMagnitudeVec2(aMove);
+
+        if (moveMagnitude < dist) {
+          continue;
+        }
+
+        Vec2 N = normalizeVec2(aMove);
+        Vec2 C = subVec2(B->position, A->position);
+        float D = dot2(N, C);
+
+        if (D <= 0) {
+          continue;
+        }
+
+        float lengthC = getMagnitudeVec2(C);
+        float F = lengthC*lengthC - D*D;
+
+        if (F >= sumRadiiSquared) {
+          continue;
+        }
+
+        float T = sumRadiiSquared - F;
+
+        if (T < 0) {
+          continue;
+        }
+
+        float distance = D - sqrtf(T);
+
+        if (moveMagnitude < distance) {
+          continue;
+        }
+
+        A->position = addVec2(A->position, scaleVec2(normalizeVec2(aMove), distance));
+
+        Vec2 n = normalizeVec2(subVec2(A->position, B->position));
+        float a1 = dot2(A->velocity, n);
+        float a2 = dot2(B->velocity, n);
+
+        float optimizedP = (2.0f * (a1 - a2)) / (A->mass + B->mass);
+
+        A->velocity = subVec2(A->velocity, scaleVec2(n, optimizedP * B->mass));
+        B->velocity = addVec2(B->velocity, scaleVec2(n, optimizedP * A->mass));
+
+        collided = true;
+        break;
+      }
+
+      if (!collided) {
+        A->position = addVec2(A->position, aMove);
+      }
+
+      A->velocity = addVec2(A->velocity, scaleVec2(A->acceleration, dt));
+    }
+
     clearBackBuffer(&bb, COLOR_BLACK);
 
     for (int i = 0; i < ARR_LEN(balls); ++i) {
-      Ball b = balls[i];
-      drawCircle(&bb, b.position, b.radius, b.color);
+      Ball *b = balls + i;
+      drawCircle(&bb, b->position, b->radius, b->color);
     }
 
     StretchDIBits(deviceContext, 0, 0, windowWidth, windowHeight,
