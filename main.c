@@ -365,13 +365,10 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
       ScreenToClient(wnd, &p);
       mousePos.x = (float)p.x / (float)bbInvScale;
       mousePos.y = (float)bb.height - (float)p.y / (float)bbInvScale;
-      char buf[100];
-      sprintf_s(buf, ARR_LEN(buf), "%f,%f\n", mousePos.x, mousePos.y);
-      OutputDebugString(buf);
     }
 
     if (buttons.fireIsPressed) {
-      balls[0].velocity = subVec2(mousePos, balls[0].position);
+      balls[0].velocity = scaleVec2(subVec2(mousePos, balls[0].position), 3.0f);
     }
 
     for (int i = 0; i < ARR_LEN(balls); ++i) {
@@ -440,6 +437,7 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
         A->position = addVec2(A->position, aMove);
       }
 
+      A->acceleration = scaleVec2(A->velocity, -0.9999f);
       A->velocity = addVec2(A->velocity, scaleVec2(A->acceleration, dt));
 
       if (A->position.x > bb.width - A->radius - 1) {
