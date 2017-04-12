@@ -274,8 +274,8 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
   wndClass.lpszClassName = "Pool";
   RegisterClass(&wndClass);
 
-  int windowWidth = 1920/2;
-  int windowHeight = 1080/2;
+  int windowWidth = 700;
+  int windowHeight = 400;
 
   RECT crect = {0};
   crect.right = windowWidth;
@@ -284,7 +284,7 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
   DWORD wndStyle = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
   AdjustWindowRect(&crect, wndStyle, 0);
 
-  HWND wnd = CreateWindowEx(0, wndClass.lpszClassName, "Pool", wndStyle, 300, 0,
+  HWND wnd = CreateWindowEx(0, wndClass.lpszClassName, "Pool", wndStyle, 300, 100,
                             crect.right - crect.left, crect.bottom - crect.top,
                             0, 0, inst, 0);
   ShowWindow(wnd, cmdShow);
@@ -306,25 +306,34 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
   BackBuffer bb = makeBackBuffer(windowWidth/bbInvScale, windowHeight/bbInvScale);
   Buttons buttons = {0};
 
-  Ball balls[2] = {0};
+  Ball balls[4] = {0};
   {
-    int i = 0;
     float radius = 10.0f;
     float mass = 10.0f;
 
-    balls[i].position.x = (float) bb.width / 4;
-    balls[i].position.y = (float) bb.height / 2;
-    balls[i].radius = radius;
-    balls[i].color = COLOR_GREEN;
-    balls[i].mass = mass;
+    balls[0].position.x = (float) bb.width / 8;
+    balls[0].position.y = (float) bb.height / 2;
+    balls[0].radius = radius;
+    balls[0].color = COLOR_GREEN;
+    balls[0].mass = mass;
 
-    ++i;
+    balls[1].position.x = (float) 3*bb.width / 4;
+    balls[1].position.y = (float) bb.height / 2;
+    balls[1].radius = radius;
+    balls[1].color = COLOR_RED;
+    balls[1].mass = mass;
 
-    balls[i].position.x = (float) bb.width / 2;
-    balls[i].position.y = (float) bb.height / 2;
-    balls[i].radius = radius;
-    balls[i].color = COLOR_RED;
-    balls[i].mass = mass;
+    balls[2].position.x = balls[1].position.x + 2*radius;
+    balls[2].position.y = balls[1].position.y - radius - 1;
+    balls[2].radius = radius;
+    balls[2].color = COLOR_PINK;
+    balls[2].mass = mass;
+
+    balls[3].position.x = balls[1].position.x + 2*radius;
+    balls[3].position.y = balls[1].position.y + radius + 1;
+    balls[3].radius = radius;
+    balls[3].color = COLOR_CYAN;
+    balls[3].mass = mass;
   }
 
   while (running) {
