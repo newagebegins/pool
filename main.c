@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
+#include <assert.h>
 
 #define PI 3.14159265358979323846f
 
@@ -45,7 +46,11 @@ float getMagnitudeVec2(Vec2 v) {
 }
 
 Vec2 normalizeVec2(Vec2 v) {
-  return scaleVec2(v, 1.0f/getMagnitudeVec2(v));
+  float m = getMagnitudeVec2(v);
+  if (fabsf(m) <= 0.001f) {
+    m = 1.0f;
+  }
+  return scaleVec2(v, 1.0f/m);
 }
 
 float dot2(Vec2 a, Vec2 b) {
