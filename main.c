@@ -442,7 +442,7 @@ int CALLBACK WinMain(HINSTANCE inst, HINSTANCE prevInst, LPSTR cmdLine, int cmdS
         A->position = addVec2(A->position, aMove);
       }
 
-      A->acceleration = scaleVec2(A->velocity, -0.9999f);
+      A->acceleration = scaleVec2(A->velocity, -0.5f); // friction
       A->velocity = addVec2(A->velocity, scaleVec2(A->acceleration, dt));
 
       if (A->position.x > bb.width - A->radius - 1) {
